@@ -1,16 +1,17 @@
 import Elysia, { t } from "elysia";
-
+import { inngest } from "@/inngest/client";
+import z from "zod";
 export const messages = new Elysia({ prefix: '/messages' })
-    .get("/", () => {
-        return "Hello World";
-    })
-    .post("/", ({ body }) => {
-        console.log("Received message:", body);
-        return { success: true };
+    .get("/", async () => {})
+    .post("/", async ({ body }) => {
+        await inngest.send({
+            name: "code-agent/codeAgent.run",
+            data: {
+                message: body.message
+            }
+        })
     }, {
-        body: t.Object({
-            projectId: t.String(),
-            content: t.String(),
-            image: t.Optional(t.String())
+        body:z.object({
+            message: z.string().min(3, "Message must be at least 3 characters long").max(1000, "Message must be at most 1000 characters long")
         })
     });
