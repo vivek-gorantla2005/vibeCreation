@@ -40,43 +40,46 @@ export function ChatInput({ projectId }: Props) {
         let imageUrl: string | undefined = undefined
 
         try {
-            if (!currentProjectId) {
-                const { data, error } = await apiClient.projects.post()
-                if (error || !data) {
-                    toast.error("Failed to create project")
-                    return
-                }
-                currentProjectId = data.id
-            }
-            if (selectedFile) {
-                const uploadRes = await startUpload([selectedFile])
-                if (uploadRes && uploadRes[0]) {
-                    imageUrl = uploadRes[0].url
-                } else {
-                    return 
-                }
-            }
+            // if (!currentProjectId) {
+            //     const { data, error } = await apiClient.projects.post()
+            //     if (error || !data) {
+            //         toast.error("Failed to create project")
+            //         return
+            //     }
+            //     currentProjectId = data.id
+            // }
+            // if (selectedFile) {
+            //     const uploadRes = await startUpload([selectedFile])
+            //     if (uploadRes && uploadRes[0]) {
+            //         imageUrl = uploadRes[0].url
+            //     } else {
+            //         return 
+            //     }
+            // }
 
-            const { error: msgError } = await apiClient.messages.post({
-                projectId: currentProjectId,
-                content: input,
-                image: imageUrl
+            // const { error: msgError } = await apiClient.messages.post({
+            //     projectId: currentProjectId,
+            //     content: input,
+            //     image: imageUrl
+            // })
+
+            // if (msgError) {
+            //     toast.error("Failed to send message")
+            //     return
+            // }
+
+            // if (!projectId && currentProjectId) {
+            //     router.push(`/projects/${currentProjectId}`)
+            // }
+
+            // setInput("")
+            // setPreviewUrl(null)
+            // setSelectedFile(null)
+            // if (fileInputRef.current) fileInputRef.current.value = ""
+            await apiClient.messages.post({
+                message: input.trim()
             })
-
-            if (msgError) {
-                toast.error("Failed to send message")
-                return
-            }
-
-            if (!projectId && currentProjectId) {
-                router.push(`/projects/${currentProjectId}`)
-            }
-
             setInput("")
-            setPreviewUrl(null)
-            setSelectedFile(null)
-            if (fileInputRef.current) fileInputRef.current.value = ""
-
         } catch (err) {
             console.error(err)
             toast.error("An unexpected error occurred")
