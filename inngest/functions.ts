@@ -5,6 +5,7 @@ import { getSandbox, toProjectPath } from "@/lib/sandbox";
 import { z } from 'zod';
 import { createTool } from "@inngest/agent-kit";
 import { PROMPT } from "./prompt";
+import { db } from "@/lib/db";
 
 interface CodeAgentState {
     summary: string;
@@ -108,6 +109,7 @@ export const codeAgentFunction = inngest.createFunction(
             ],
             lifecycle: {
                 onResponse: async ({ result, network }) => {
+                    console.log("[onResponse] Processing result:", JSON.stringify(result.output.map(m => ({ role: m.role, type: m.type })), null, 2))
                     const lastMessage = result.output.findLastIndex(
                         (message) => message.role === "assistant",
                     );
@@ -115,14 +117,16 @@ export const codeAgentFunction = inngest.createFunction(
                     const message =
                         (result.output[lastMessage] as TextMessage) || undefined;
 
-                    const lastTextMessage = message.content
+                    const lastTextMessage = message?.content
                         ? typeof message.content === "string"
                             ? message.content
                             : message.content.map((c) => c.text).join("")
                         : undefined;
 
                     if (lastTextMessage && network) {
+                        console.log("[onResponse] Last text message:", lastTextMessage.substring(0, 100));
                         if (lastTextMessage.includes("<task_summary>")) {
+                            console.log("[onResponse] Found task summary, setting state");
                             network.state.data.summary = lastTextMessage;
                         }
                     }
@@ -135,29 +139,65 @@ export const codeAgentFunction = inngest.createFunction(
         const network = createNetwork<CodeAgentState>({
             name: "coding-agent-network",
             agents: [codeAgent],
-            maxIter: 20,
-            router: async ({ network }) => {
+            router: ({ network }) => {
                 if (network.state.data.summary) {
-                    return;
+                    return undefined
                 }
-
-                return codeAgent;
-            }
+                return codeAgent
+            },
+            maxIter: 20,
         })
 
-        const result = await network.run(event.data.message, {
-            state: {
-                summary: "",
-                files: {}
+        let result;
+        try {
+            result = await network.run(event.data.message, {
+                state: {
+                    summary: "",
+                    files: {}
+                }
+            })
+        } catch (error: any) {
+            console.error('[Network Error]', error)
+            // Create a fallback result
+            result = {
+                state: {
+                    data: {
+                        summary: `I encountered an error: ${error.message}. Please try rephrasing your request.`,
+                        files: {}
+                    }
+                }
             }
-        })
-
+        }
 
         const sandboxUrl = await step.run('get-sandbox-url', async () => {
             const sandbox = await getSandbox(sandboxId)
             const host = sandbox.getHost(3000)
             return `https://${host}`
         })
+
+        await step.run('save-result', async () => {
+            const assistantMessage = await db.message.create({
+                data: {
+                    content: result.state.data.summary || "Here is your updated project.",
+                    role: "ASSISTANT",
+                    type: "RESULT",
+                    projectId: event.data.projectId
+                }
+            })
+
+            if (result.state.data.files && Object.keys(result.state.data.files).length > 0) {
+                await db.codeFragment.create({
+                    data: {
+                        messageId: assistantMessage.id,
+                        sandboxUrl,
+                        sandboxId,
+                        title: 'Code Fragment',
+                        files: result.state.data.files
+                    }
+                })
+            }
+        })
+
         return {
             sandboxUrl,
             title: 'Code Fragment',

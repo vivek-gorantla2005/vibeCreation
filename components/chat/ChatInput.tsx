@@ -13,9 +13,10 @@ import { useRouter } from "next/navigation"
 
 interface Props {
     projectId?: string
+    onMessageSent?: (message: { content: string; role: "USER"; type: "RESULT" }) => void
 }
 
-export function ChatInput({ projectId }: Props) {
+export function ChatInput({ projectId, onMessageSent }: Props) {
     const [input, setInput] = React.useState("")
     const [previewUrl, setPreviewUrl] = React.useState<string | null>(null)
     const [selectedFile, setSelectedFile] = React.useState<File | null>(null)
@@ -36,53 +37,40 @@ export function ChatInput({ projectId }: Props) {
     const handleSend = async () => {
         if (!input.trim() && !selectedFile) return
 
-        let currentProjectId = projectId
-        let imageUrl: string | undefined = undefined
+        const messageContent = input.trim()
+
+        // Optimistically update UI immediately
+        onMessageSent?.({
+            content: messageContent,
+            role: "USER",
+            type: "RESULT"
+        })
+
+        // Clear input immediately for better UX
+        setInput("")
 
         try {
-            // if (!currentProjectId) {
-            //     const { data, error } = await apiClient.projects.post()
-            //     if (error || !data) {
-            //         toast.error("Failed to create project")
-            //         return
-            //     }
-            //     currentProjectId = data.id
-            // }
-            // if (selectedFile) {
-            //     const uploadRes = await startUpload([selectedFile])
-            //     if (uploadRes && uploadRes[0]) {
-            //         imageUrl = uploadRes[0].url
-            //     } else {
-            //         return 
-            //     }
-            // }
+            if (!projectId) {
+                // Create new project with initial message
+                const project = await apiClient.projects.post({
+                    message: messageContent
+                })
+                if (project.data?.id) {
+                    router.push(`/projects/${project.data.id}`)
+                }
+                return // Don't send separate message, it's already created with the project
+            }
 
-            // const { error: msgError } = await apiClient.messages.post({
-            //     projectId: currentProjectId,
-            //     content: input,
-            //     image: imageUrl
-            // })
-
-            // if (msgError) {
-            //     toast.error("Failed to send message")
-            //     return
-            // }
-
-            // if (!projectId && currentProjectId) {
-            //     router.push(`/projects/${currentProjectId}`)
-            // }
-
-            // setInput("")
-            // setPreviewUrl(null)
-            // setSelectedFile(null)
-            // if (fileInputRef.current) fileInputRef.current.value = ""
+            // Send message to existing project
             await apiClient.messages.post({
-                message: input.trim()
+                message: messageContent,
+                projectId: projectId
             })
-            setInput("")
         } catch (err) {
             console.error(err)
-            toast.error("An unexpected error occurred")
+            toast.error("Failed to send message")
+            // Restore input on error
+            setInput(messageContent)
         }
     }
 
@@ -107,7 +95,7 @@ export function ChatInput({ projectId }: Props) {
     }
 
     return (
-        <div className="w-full max-w-2xl mx-auto p-4 flex flex-col gap-3 bg-background/50 backdrop-blur-xl border border-border/50 rounded-3xl shadow-2xl ring-1 ring-border/20">
+        <div className="w-full max-w-3xl mx-auto p-4 flex flex-col gap-3 bg-background/50 backdrop-blur-xl border border-border/50 rounded-3xl shadow-2xl ring-1 ring-border/20">
             {previewUrl && (
                 <ImagePreview
                     src={previewUrl}
