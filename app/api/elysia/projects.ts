@@ -40,4 +40,16 @@ export const projects = new Elysia({ prefix: '/projects' }).post(
             message: t.String({ minLength: 1, maxLength: 1000 })
         })
     }
+).get(
+    "/",
+    async () => {
+        console.log('[Projects API] Fetching projects')
+        const projects = await db.project.findMany({
+            include: {
+                messages: true
+            }
+        })
+        console.log('[Projects API] Found projects:', projects.length)
+        return projects
+    }
 );
