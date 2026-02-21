@@ -1,36 +1,91 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# VibeCreation 🚀
 
-## Getting Started
+VibeCreation is a premium, AI-powered collaborative coding platform that enables users to build, preview, and iterate on full-stack web applications through natural language conversation. It combines the power of modern LLMs with a real-time, sandboxed execution environment to turn ideas into working code instantly.
 
-First, run the development server:
+## ✨ Features
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+- **💬 Agentic AI Chat**: A sophisticated coding assistant powered by **Gemini 2.0 Flash** that understands complex requirements and multi-step tasks.
+- **🏗️ Real-time Generation**: Watch your project come to life as the AI creates files, installs dependencies, and runs terminal commands in real-time.
+- **🌐 Live Preview**: Instant, hot-reloading preview of your application hosted in an isolated **E2B sandbox**.
+- **📂 Full File Explorer**: A modern IDE-like experience with a **Monaco Editor**, supporting multi-file navigation and persistent edits.
+- **⚡ Inngest Orchestration**: Powered by **Inngest** for robust background job handling and real-time status streaming to the UI.
+- **📦 Code Fragments**: Review specific changes in detail through interactive dialogs that track exactly which files were created in each AI response.
+- **🎨 Premium Design**: A sleek, glassmorphic interface built with **Tailwind CSS v4** and **shadcn/ui**, featuring high-fidelity animations and a refined dark mode.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 🛠️ Tech Stack
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- **Framework**: [Next.js 16 (App Router)](https://nextjs.org/)
+- **AI Engine**: [Inngest Agent Kit](https://www.inngest.com/docs/agent-kit) + [Google Gemini 2.0](https://ai.google.dev/)
+- **Runtime**: [E2B Code Interpreter](https://e2b.dev/) (Dedicated cloud sandboxes)
+- **Workflow & Real-time**: [Inngest](https://www.inngest.com/)
+- **Database**: [Prisma](https://www.prisma.io/) + PostgreSQL
+- **API**: [ElysiaJS](https://elysiajs.com/) (High-performance Type-Safe API)
+- **Styling**: [Tailwind CSS v4](https://tailwindcss.com/) + [Motion](https://motion.dev/)
+- **Editor**: [Monaco Editor](https://microsoft.github.io/monaco-editor/)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## 🚀 Getting Started
 
-## Learn More
+### Prerequisites
 
-To learn more about Next.js, take a look at the following resources:
+- Node.js 18+
+- PostgreSQL instance
+- [Inngest Cloud](https://www.inngest.com/) or Local Dev Server
+- API Keys for:
+  - Google Gemini (AI)
+  - E2B (Sandboxing)
+  - Unsplash (Assets)
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### Installation
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+1. **Clone the repository**:
+   ```bash
+   git clone https://github.com/yourusername/vibecreation.git
+   cd vibecreation/my-app
+   ```
 
-## Deploy on Vercel
+2. **Install dependencies**:
+   ```bash
+   npm install
+   ```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+3. **Set up Environment Variables**:
+   Create a `.env` file in the root and add your secrets:
+   ```env
+   DATABASE_URL="postgresql://..."
+   GEMINI_API_KEY="..."
+   E2B_API_KEY="..."
+   INNGEST_EVENT_KEY="..."
+   INNGEST_SIGNING_KEY="..."
+   UNSPLASH_API_KEY="..."
+   ```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+4. **Initialize Database**:
+   ```bash
+   npx prisma generate
+   npx prisma db push
+   ```
+
+5. **Run the Development Servers**:
+   In two separate terminals:
+   ```bash
+   # Terminal 1: Next.js app
+   npm run dev
+
+   # Terminal 2: Inngest Dev Server
+   npx inngest-cli@latest dev
+   ```
+
+## 🧠 Project Structure
+
+- `app/` - Next.js App Router (Dashboard, Projects, API)
+- `components/` - Core UI components including `ChatSection`, `FileExplorer`, and `ProjectView`.
+- `inngest/` - Agent logic, tool definitions, and background functions.
+- `lib/` - Shared utilities, API clients, and database configuration.
+- `prisma/` - Database schema and generated client.
+
+## 🤝 Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+---
+Built with ❤️ by the VibeCreation Team.

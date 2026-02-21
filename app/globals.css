@@ -120,7 +120,51 @@
   * {
     @apply border-border outline-ring/50;
   }
+
   body {
     @apply bg-background text-foreground;
   }
+}
+
+.shimmer-text {
+  background: linear-gradient(90deg,
+      #3b82f6 0%,
+      #60a5fa 50%,
+      #3b82f6 100%);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: shimmer 2s linear infinite;
+  display: inline-block;
+}
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes progress {
+  0% {
+    transform: translateX(-100%);
+    width: 20%;
+  }
+
+  50% {
+    width: 50%;
+  }
+
+  100% {
+    transform: translateX(500%);
+    width: 20%;
+  }
+}
+
+.animate-shimmer {
+  animation: shimmer 2s linear infinite;
 }

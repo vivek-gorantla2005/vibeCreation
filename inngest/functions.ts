@@ -1,26 +1,117 @@
 import { inngest } from "./client";
-import { createAgent, createNetwork, gemini, TextMessage, Tool } from '@inngest/agent-kit';
+import { createAgent, createNetwork, createState, gemini, type Message, TextMessage, Tool } from '@inngest/agent-kit';
 import Sandbox from "@e2b/code-interpreter"
 import { getSandbox, toProjectPath } from "@/lib/sandbox";
 import { z } from 'zod';
 import { createTool } from "@inngest/agent-kit";
 import { PROMPT } from "./prompt";
 import { db } from "@/lib/db";
+import { searchUnsplashPhoto } from "@/lib/unsplash";
+import { UnsplashAttribution } from "@/lib/unsplash";
+import { channel, topic } from "@inngest/realtime";
 
 interface CodeAgentState {
     summary: string;
     files: Record<string, string>;
 }
 
+export const userChannel = channel("project").addTopic(
+    topic("projectInfo").type<string>(),
+);
+
+
+const TIMEOUT_MS = 60 * 60 * 1000
+
 export const codeAgentFunction = inngest.createFunction(
     { id: "code-agent" },
     { event: "code-agent/codeAgent.run" },
-    async ({ event, step }) => {
+    async ({ event, step, publish }) => {
 
         const sandboxId = await step.run('get-or-create-sandbox', async () => {
-            const sb = await Sandbox.create("23eg105j66/vibecreation-v1")
+            const project = await db.project.findUnique({
+                where: {
+                    id: event.data.projectId
+                },
+                select: {
+                    sandboxId: true
+                }
+            })
+
+            if (!project) {
+                throw new Error("Project not found")
+            }
+
+            if (project?.sandboxId) {
+                const sandbox = await Sandbox.connect(project.sandboxId,{
+                    timeoutMs: TIMEOUT_MS
+                })
+                return sandbox.sandboxId
+            }
+
+            const sb = await Sandbox.create("23eg105j66/vibecreation-v1",{
+                timeoutMs: TIMEOUT_MS
+            })
+
+            await db.project.update({
+                where: {
+                    id: event.data.projectId
+                },
+                data: {
+                    sandboxId: sb.sandboxId
+                }
+            })
+
             return sb.sandboxId
         })
+
+        const getPrevMsg = await step.run('get-prev-messages',async()=>{
+            const messages = await db.message.findMany({
+                where: {
+                    projectId: event.data.projectId
+                },
+                orderBy: {
+                    updatedAt: 'desc'
+                },
+                take: 10
+            })
+            
+            const latestMessages = messages.map(message=>{
+                return {
+                    type:'text',
+                    role : message.role === 'ASSISTANT' ? 'assistant' : 'user',
+                    content: message.content
+                }
+            }).reverse()
+
+            return latestMessages as Message[]
+        })
+
+        const getPrevCodefiles = await step.run('get-prev-code-files',async()=>{
+            const lastMessage = await db.message.findFirst({
+                where: {
+                    projectId: event.data.projectId,
+                    codeFragment:{
+                        isNot:null
+                    }
+                },
+                orderBy: {
+                    updatedAt: 'desc'
+                },
+                include:{
+                    codeFragment:true
+                }
+            })
+            return (lastMessage?.codeFragment?.files as Record<string,string>)||{}
+        })
+
+        const codingAgentState = createState<CodeAgentState>({
+            summary:"",
+            files:getPrevCodefiles
+        },{
+            messages:getPrevMsg
+        })
+
+
 
         const codeAgent = createAgent<CodeAgentState>({
             name: 'Coding Agent',
@@ -37,6 +128,13 @@ export const codeAgentFunction = inngest.createFunction(
                         command: z.string()
                     }),
                     handler: async ({ command }) => {
+                        console.log("[Realtime] Publishing terminal status...");
+                        await publish(
+                            await userChannel().projectInfo(
+                                "Running terminal command...",
+                            ),
+                        );
+                        console.log("[Realtime] Terminal status published.");
                         const buffers = { stdout: "", stderr: "" }
                         try {
                             const sandbox = await getSandbox(sandboxId)
@@ -65,6 +163,13 @@ export const codeAgentFunction = inngest.createFunction(
                         }))
                     }),
                     handler: async ({ files }, { step, network }: Tool.Options<CodeAgentState>) => {
+                        console.log("[Realtime] Publishing file status...");
+                        await publish(
+                            await userChannel().projectInfo(
+                                "Generating project files...",
+                            ),
+                        );
+                        console.log("[Realtime] File status published.");
                         const newFiles = await step?.run("createOrUpdateFiles", async () => {
                             try {
                                 const updatedFiles = network.state.data.files || {}
@@ -90,6 +195,13 @@ export const codeAgentFunction = inngest.createFunction(
                     description: 'Read Files from the sandbox',
                     parameters: z.object({ files: z.array(z.string()) }),
                     handler: async ({ files }, { step }) => {
+                        console.log("[Realtime] Publishing read status...");
+                        await publish(
+                            await userChannel().projectInfo(
+                                "Reading files...",
+                            ),
+                        );
+                        console.log("[Realtime] Read status published.");
                         return await step?.run("readFiles", async () => {
                             try {
                                 const contents: Record<string, string>[] = []
@@ -105,7 +217,101 @@ export const codeAgentFunction = inngest.createFunction(
                             }
                         })
                     }
-                })
+                }),
+                createTool({
+                    name: "unsplashImage",
+                    description:
+                        "Search Unsplash and download an image into /public/assets/unsplash. Return local public path and attributions.",
+                    parameters: z.object({
+                        query: z.string().min(2),
+                        orientation: z
+                            .enum(["landscape", "portrait", "squarish"])
+                            .default("landscape"),
+                        purpose: z
+                            .enum([
+                                "hero",
+                                "feature",
+                                "testimonial",
+                                "background",
+                                "listing",
+                                "generic",
+                            ])
+                            .default("generic"),
+                        filenameHint: z.string().default(""),
+                    }),
+                    handler: async ({ query, orientation, purpose, filenameHint }) => {
+                        console.log("[Realtime] Publishing unsplash status...");
+                        await publish(
+                            await userChannel().projectInfo(
+                                "Downloading images from Unsplash...",
+                            ),
+                        );
+                        console.log("[Realtime] Unsplash status published.");
+                        const accessKey = process.env.UNSPLASH_API_KEY;
+
+                        if (!accessKey) {
+                            throw new Error("Missing Unsplash API Key");
+                        }
+
+                        const sandbox = await getSandbox(sandboxId);
+
+                        const search = await searchUnsplashPhoto({
+                            accessKey,
+                            query,
+                            orientation,
+                        });
+
+                        const photo = search.results[0];
+                        if (!photo)
+                            throw new Error(`No Unsplash result for query: ${query}`);
+
+                        const imageUrl =
+                            (purpose === "background"
+                                ? photo.urls.full
+                                : photo.urls.regular) ?? photo.urls.regular;
+
+                        if (!imageUrl)
+                            throw new Error("Unsplash result missing usable image URL");
+
+                        const safeSlug = String(filenameHint ?? photo.id ?? query)
+                            .toLowerCase()
+                            .replace(/[^a-z0-9]+/g, "-")
+                            .replace(/(^-|-$)/g, "")
+                            .slice(0, 60);
+
+                        const publicDir = "/home/user/project/public/assets/unsplash";
+                        const localFile = `${publicDir}/${safeSlug}.jpg`;
+                        const publicPath = `/assets/unsplash/${safeSlug}.jpg`;
+
+                        await sandbox.commands.run(`mkdir -p "${publicDir}"`);
+
+                        const cmd = `curl -L --fail --silent --show-error "${imageUrl}" -o "${localFile}"`;
+                        const result = await sandbox.commands.run(cmd);
+
+                        if (result.exitCode !== 0) {
+                            const msg = (result.stderr || result.stdout || "").slice(0, 800);
+                            throw new Error(`Failed to download Unsplash image: ${msg}`);
+                        }
+
+                        const photographerName = photo.user.name ?? null;
+                        const photographerUsername = photo.user.username ?? null;
+                        const photoUrl = photo.links.html ?? null;
+
+                        const attributionUrl =
+                            photoUrl !== null
+                                ? `${photoUrl}?utm_source=vibeCreation&utm_medium=referral`
+                                : null;
+
+                        const attribution: UnsplashAttribution = {
+                            photographerName,
+                            photographerUsername,
+                            photoUrl,
+                            attributionUrl,
+                        };
+
+                        return { publicPath, localFile, attribution };
+                    },
+                }),
             ],
             lifecycle: {
                 onResponse: async ({ result, network }) => {
@@ -146,16 +352,12 @@ export const codeAgentFunction = inngest.createFunction(
                 return codeAgent
             },
             maxIter: 20,
+            defaultState:codingAgentState
         })
 
         let result;
         try {
-            result = await network.run(event.data.message, {
-                state: {
-                    summary: "",
-                    files: {}
-                }
-            })
+            result = await network.run(event.data.message, {state:codingAgentState})
         } catch (error: any) {
             console.error('[Network Error]', error)
             // Create a fallback result
@@ -176,6 +378,13 @@ export const codeAgentFunction = inngest.createFunction(
         })
 
         await step.run('save-result', async () => {
+            console.log("[Realtime] Publishing save status...");
+            await publish(
+                await userChannel().projectInfo(
+                    "Saving files to database...",
+                ),
+            );
+            console.log("[Realtime] Save status published.");
             const assistantMessage = await db.message.create({
                 data: {
                     content: result.state.data.summary || "Here is your updated project.",

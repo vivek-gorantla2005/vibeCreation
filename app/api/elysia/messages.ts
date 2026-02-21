@@ -6,7 +6,7 @@ export const messages = new Elysia({ prefix: '/messages' })
     .get("/", async ({ query }) => {
         const messages = await db.message.findMany({
             where: { projectId: query.projectId },
-            orderBy: { updatedAt: "desc" },
+            orderBy: { createdAt: "asc" },
             include: {
                 codeFragment: true
             }

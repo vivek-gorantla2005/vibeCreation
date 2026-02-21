@@ -5,14 +5,15 @@ import { Globe } from 'lucide-react'
 
 interface Props {
     activeCodeFragment: CodeFragment | null
+    previewKey?: number
 }
 
-export const PreviewSection = ({ activeCodeFragment }: Props) => {
+export const PreviewSection = ({ activeCodeFragment, previewKey = 0 }: Props) => {
     return (
         <TabsContent value="Preview" className="h-full m-0 rounded-2xl overflow-hidden border bg-white shadow-xl ring-1 ring-border/50">
             {activeCodeFragment ? (
                 <iframe
-                    src={activeCodeFragment.sandboxUrl}
+                    src={`${activeCodeFragment.sandboxUrl}?v=${previewKey}`}
                     className="w-full h-full border-none"
                     title="Preview"
                 />

@@ -41,6 +41,22 @@ export const ProjectView = ({ projectId, initialMessages }: Props) => {
         sandboxUrl: string;
     } | null>(null)
 
+    const [previewKey, setPreviewKey] = useState(0)
+    const [liveFiles, setLiveFiles] = useState<Record<string, string>>({})
+    const [selectedFile, setSelectedFile] = useState<string | null>(null)
+
+    const handleRefresh = () => {
+        setPreviewKey(prev => prev + 1)
+    }
+
+    // Sync liveFiles when fragment or data changes
+    useEffect(() => {
+        const sourceFiles = (fragmentData?.files || activeCodeFragment?.files) as Record<string, string>
+        if (sourceFiles) {
+            setLiveFiles(sourceFiles)
+        }
+    }, [fragmentData?.sandboxId, activeCodeFragment?.id])
+
     useEffect(() => {
         const fetchFiles = async () => {
             try {
@@ -55,12 +71,6 @@ export const ProjectView = ({ projectId, initialMessages }: Props) => {
         }
         fetchFiles()
     }, [projectId])
-
-    useEffect(() => {
-        if (scrollRef.current) {
-            scrollRef.current.scrollTop = scrollRef.current.scrollHeight
-        }
-    }, [messages])
 
     // Update active code fragment when a new message with one arrives
     useEffect(() => {
@@ -105,7 +115,7 @@ export const ProjectView = ({ projectId, initialMessages }: Props) => {
             } catch (error) {
                 console.error('Failed to poll messages:', error)
             }
-        }, 2000) 
+        }, 2000)
 
         return () => clearInterval(pollInterval)
     }, [isAIResponding, messages.length, projectId])
@@ -141,11 +151,20 @@ export const ProjectView = ({ projectId, initialMessages }: Props) => {
 
                                 {/* PreviewSection */}
 
-                                <PreviewSection activeCodeFragment={activeCodeFragment}/>
+                                <PreviewSection activeCodeFragment={activeCodeFragment} previewKey={previewKey} />
 
 
                                 {/* CodeSection */}
-                                <CodeSection activeCodeFragment={activeCodeFragment} fragmentData={fragmentData} projectId={projectId} />
+                                <CodeSection
+                                    activeCodeFragment={activeCodeFragment}
+                                    fragmentData={fragmentData}
+                                    projectId={projectId}
+                                    onSave={handleRefresh}
+                                    liveFiles={liveFiles}
+                                    setLiveFiles={setLiveFiles}
+                                    selectedFile={selectedFile}
+                                    setSelectedFile={setSelectedFile}
+                                />
                             </div>
                         </Tabs>
                     </div>

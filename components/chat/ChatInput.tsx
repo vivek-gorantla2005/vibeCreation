@@ -34,34 +34,31 @@ export function ChatInput({ projectId, onMessageSent }: Props) {
         },
     })
 
+
     const handleSend = async () => {
         if (!input.trim() && !selectedFile) return
 
         const messageContent = input.trim()
 
-        // Optimistically update UI immediately
         onMessageSent?.({
             content: messageContent,
             role: "USER",
             type: "RESULT"
         })
 
-        // Clear input immediately for better UX
         setInput("")
 
         try {
             if (!projectId) {
-                // Create new project with initial message
                 const project = await apiClient.projects.post({
                     message: messageContent
                 })
                 if (project.data?.id) {
                     router.push(`/projects/${project.data.id}`)
                 }
-                return // Don't send separate message, it's already created with the project
+                return
             }
 
-            // Send message to existing project
             await apiClient.messages.post({
                 message: messageContent,
                 projectId: projectId
