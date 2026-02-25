@@ -5,3 +5,7 @@ const baseUrl = process.env.NEXT_PUBLIC_BASE_URL ||
     (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000')
 
 export const apiClient = treaty<App>(baseUrl).api
+
+export const getApiClient = (headers?:Headers)=>{
+    return treaty<App>(baseUrl, {headers}).api
+}

@@ -15,7 +15,7 @@ interface CodeAgentState {
     files: Record<string, string>;
 }
 
-export const userChannel = channel("project").addTopic(
+export const userChannel = channel((projectId: string) => `project.${projectId}`).addTopic(
     topic("projectInfo").type<string>(),
 );
 
@@ -42,13 +42,13 @@ export const codeAgentFunction = inngest.createFunction(
             }
 
             if (project?.sandboxId) {
-                const sandbox = await Sandbox.connect(project.sandboxId,{
+                const sandbox = await Sandbox.connect(project.sandboxId, {
                     timeoutMs: TIMEOUT_MS
                 })
                 return sandbox.sandboxId
             }
 
-            const sb = await Sandbox.create("23eg105j66/vibecreation-v1",{
+            const sb = await Sandbox.create("23eg105j66/vibecreation-v1", {
                 timeoutMs: TIMEOUT_MS
             })
 
@@ -64,21 +64,22 @@ export const codeAgentFunction = inngest.createFunction(
             return sb.sandboxId
         })
 
-        const getPrevMsg = await step.run('get-prev-messages',async()=>{
+        const getPrevMsg = await step.run('get-prev-messages', async () => {
             const messages = await db.message.findMany({
                 where: {
-                    projectId: event.data.projectId
+                    projectId: event.data.projectId,
+                    userId: event.data.userId
                 },
                 orderBy: {
                     updatedAt: 'desc'
                 },
                 take: 10
             })
-            
-            const latestMessages = messages.map(message=>{
+
+            const latestMessages = messages.map(message => {
                 return {
-                    type:'text',
-                    role : message.role === 'ASSISTANT' ? 'assistant' : 'user',
+                    type: 'text',
+                    role: message.role === 'ASSISTANT' ? 'assistant' : 'user',
                     content: message.content
                 }
             }).reverse()
@@ -86,29 +87,30 @@ export const codeAgentFunction = inngest.createFunction(
             return latestMessages as Message[]
         })
 
-        const getPrevCodefiles = await step.run('get-prev-code-files',async()=>{
+        const getPrevCodefiles = await step.run('get-prev-code-files', async () => {
             const lastMessage = await db.message.findFirst({
                 where: {
                     projectId: event.data.projectId,
-                    codeFragment:{
-                        isNot:null
+                    userId: event.data.userId,
+                    codeFragment: {
+                        isNot: null
                     }
                 },
                 orderBy: {
                     updatedAt: 'desc'
                 },
-                include:{
-                    codeFragment:true
+                include: {
+                    codeFragment: true
                 }
             })
-            return (lastMessage?.codeFragment?.files as Record<string,string>)||{}
+            return (lastMessage?.codeFragment?.files as Record<string, string>) || {}
         })
 
         const codingAgentState = createState<CodeAgentState>({
-            summary:"",
-            files:getPrevCodefiles
-        },{
-            messages:getPrevMsg
+            summary: "",
+            files: getPrevCodefiles
+        }, {
+            messages: getPrevMsg
         })
 
 
@@ -130,7 +132,7 @@ export const codeAgentFunction = inngest.createFunction(
                     handler: async ({ command }) => {
                         console.log("[Realtime] Publishing terminal status...");
                         await publish(
-                            await userChannel().projectInfo(
+                            await userChannel(event.data.projectId).projectInfo(
                                 "Running terminal command...",
                             ),
                         );
@@ -165,7 +167,7 @@ export const codeAgentFunction = inngest.createFunction(
                     handler: async ({ files }, { step, network }: Tool.Options<CodeAgentState>) => {
                         console.log("[Realtime] Publishing file status...");
                         await publish(
-                            await userChannel().projectInfo(
+                            await userChannel(event.data.projectId).projectInfo(
                                 "Generating project files...",
                             ),
                         );
@@ -197,7 +199,7 @@ export const codeAgentFunction = inngest.createFunction(
                     handler: async ({ files }, { step }) => {
                         console.log("[Realtime] Publishing read status...");
                         await publish(
-                            await userChannel().projectInfo(
+                            await userChannel(event.data.projectId).projectInfo(
                                 "Reading files...",
                             ),
                         );
@@ -242,7 +244,7 @@ export const codeAgentFunction = inngest.createFunction(
                     handler: async ({ query, orientation, purpose, filenameHint }) => {
                         console.log("[Realtime] Publishing unsplash status...");
                         await publish(
-                            await userChannel().projectInfo(
+                            await userChannel(event.data.projectId).projectInfo(
                                 "Downloading images from Unsplash...",
                             ),
                         );
@@ -352,12 +354,12 @@ export const codeAgentFunction = inngest.createFunction(
                 return codeAgent
             },
             maxIter: 20,
-            defaultState:codingAgentState
+            defaultState: codingAgentState
         })
 
         let result;
         try {
-            result = await network.run(event.data.message, {state:codingAgentState})
+            result = await network.run(event.data.message, { state: codingAgentState })
         } catch (error: any) {
             console.error('[Network Error]', error)
             // Create a fallback result
@@ -380,7 +382,7 @@ export const codeAgentFunction = inngest.createFunction(
         await step.run('save-result', async () => {
             console.log("[Realtime] Publishing save status...");
             await publish(
-                await userChannel().projectInfo(
+                await userChannel(event.data.projectId).projectInfo(
                     "Saving files to database...",
                 ),
             );
@@ -390,7 +392,8 @@ export const codeAgentFunction = inngest.createFunction(
                     content: result.state.data.summary || "Here is your updated project.",
                     role: "ASSISTANT",
                     type: "RESULT",
-                    projectId: event.data.projectId
+                    projectId: event.data.projectId,
+                    userId: event.data.userId
                 }
             })
 
@@ -401,7 +404,8 @@ export const codeAgentFunction = inngest.createFunction(
                         sandboxUrl,
                         sandboxId,
                         title: 'Code Fragment',
-                        files: result.state.data.files
+                        files: result.state.data.files,
+                        userId: event.data.userId
                     }
                 })
             }

@@ -32,7 +32,11 @@ export const ProjectView = ({ projectId, initialMessages }: Props) => {
     const [activeCodeFragment, setActiveCodeFragment] = useState<CodeFragment | null>(null)
     const [tabState, setTabState] = useState<"code" | "Preview">("Preview")
     const [messages, setMessages] = useState(initialMessages || [])
-    const [isAIResponding, setIsAIResponding] = useState(false)
+    const [isAIResponding, setIsAIResponding] = useState(() => {
+        if (!initialMessages || initialMessages.length === 0) return false
+        const lastMessage = initialMessages[initialMessages.length - 1]
+        return lastMessage.role === "USER"
+    })
     const scrollRef = useRef<HTMLDivElement>(null)
 
     const [fragmentData, setFragmentData] = useState<{

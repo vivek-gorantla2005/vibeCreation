@@ -2,19 +2,41 @@ import Elysia from "elysia";
 import { z } from "zod"
 import { db } from "@/lib/db"
 import { getSandbox, toProjectPath } from "@/lib/sandbox";
+import { clerkPlugin } from "elysia-clerk";
+import { auth } from "@clerk/nextjs/server";
 
 export const fragments = new Elysia({ prefix: '/fragments' })
-    .patch("/:fragmentId", async ({ body, params }) => {
+    .patch("/:fragmentId", async ({ body, params, set }) => {
+        const { userId } = await auth()
+
+        if (!userId) {
+            set.status = 401
+            return { error: "Unauthorized" }
+        }
         const existingFragment = await db.codeFragment.findUnique({
             where: {
                 id: params.fragmentId
-            }, select: {
-                files: true,
-                sandboxId: true,
+            }, include: {
+                message: {
+                    select: {
+                        projectId: true,
+                        project: {
+                            select: {
+                                userId: true
+                            }
+                        }
+                    }
+                }
             }
         })
         if (!existingFragment) {
-            throw new Error("Fragment not found")
+            set.status = 404
+            return { error: "Fragment not found" }
+        }
+
+        if (existingFragment.userId !== userId) {
+            set.status = 403
+            return { error: "Forbidden: You don't have permission to edit this fragment" }
         }
 
         const sandboxId = existingFragment.sandboxId || body.sandboxId
@@ -58,9 +80,29 @@ export const fragments = new Elysia({ prefix: '/fragments' })
             fragmentId: z.string().min(3, 'fragment id is required')
         })
     })
-    .get("/", async ({ query }) => {
+    .get("/", async ({ query, set }) => {
+        const { userId } = await auth()
+
+        if (!userId) {
+            set.status = 401
+            return { error: "Unauthorized" }
+        }
+
+        const project = await db.project.findFirst({
+            where: {
+                id: query.projectId,
+                userId: userId
+            }
+        })
+
+        if (!project) {
+            set.status = 403
+            return { error: "Forbidden: You don't have access to this project" }
+        }
+
         const fragment = await db.codeFragment.findFirst({
             where: {
+                userId: userId,
                 message: {
                     projectId: query.projectId
                 }
@@ -80,18 +122,33 @@ export const fragments = new Elysia({ prefix: '/fragments' })
             projectId: z.string().min(3, 'project id is required')
         })
     })
-    .get("/:fragmentId", async ({ params }) => {
+    .get("/:fragmentId", async ({ params, set }) => {
+        const { userId } = await auth()
+
+        if (!userId) {
+            set.status = 401
+            return { error: "Unauthorized" }
+        }
         const fragment = await db.codeFragment.findUnique({
             where: {
                 id: params.fragmentId
-            }, select: {
-                files: true,
-                sandboxId: true,
-                sandboxUrl: true,
+            },
+            include: {
+                message: {
+                    include: {
+                        project: true
+                    }
+                }
             }
         })
         if (!fragment) {
-            throw new Error("Fragment not found")
+            set.status = 404
+            return { error: "Fragment not found" }
+        }
+
+        if (fragment.userId !== userId) {
+            set.status = 403
+            return { error: "Forbidden: You don't have access to this fragment" }
         }
         return fragment
     }, {

@@ -5,9 +5,9 @@ import { getSubscriptionToken, Realtime } from "@inngest/realtime";
 
 export type UserChannelToken = Realtime.Token<typeof userChannel, ["projectInfo"]>;
 
-export async function fetchRealtimeSubscriptionToken(): Promise<UserChannelToken> {
+export async function fetchRealtimeSubscriptionToken(projectId: string): Promise<UserChannelToken> {
   const token = await getSubscriptionToken(inngest, {
-    channel: userChannel(),
+    channel: userChannel(projectId),
     topics: ["projectInfo"] as const,
   });
 

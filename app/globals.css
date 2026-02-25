@@ -168,3 +168,12 @@
 .animate-shimmer {
   animation: shimmer 2s linear infinite;
 }
+
+.scrollbar-none {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}

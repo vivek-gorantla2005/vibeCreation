@@ -3,10 +3,16 @@ import { messages } from '../elysia/messages'
 import { projects } from '../elysia/projects'
 import { fragments } from '../elysia/fragments'
 
+import { clerkPlugin } from 'elysia-clerk'
+
 const app = new Elysia({ prefix: '/api' })
-.use(messages)
-.use(projects)
-.use(fragments)
+    .use(clerkPlugin({
+        secretKey: process.env.CLERK_SECRET_KEY!,
+        publishableKey: process.env.CLERK_PUBLISHABLE_KEY!,
+    }))
+    .use(messages)
+    .use(projects)
+    .use(fragments)
 
 export const GET = app.fetch
 export const POST = app.fetch

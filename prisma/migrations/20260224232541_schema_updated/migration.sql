@@ -8,9 +8,11 @@ CREATE TYPE "MessageType" AS ENUM ('RESULT', 'ERROR');
 CREATE TABLE "Project" (
     "id" TEXT NOT NULL,
     "name" TEXT NOT NULL,
-    "sandboxId" VARCHAR(64) NOT NULL,
+    "sandboxId" VARCHAR(64),
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
+    "imageURL" TEXT,
+    "userId" VARCHAR(128),
 
     CONSTRAINT "Project_pkey" PRIMARY KEY ("id")
 );
@@ -24,6 +26,8 @@ CREATE TABLE "Message" (
     "projectId" TEXT NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
+    "imageURL" TEXT,
+    "userId" VARCHAR(128),
 
     CONSTRAINT "Message_pkey" PRIMARY KEY ("id")
 );
@@ -38,6 +42,8 @@ CREATE TABLE "CodeFragment" (
     "files" JSONB NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
+    "designSpec" TEXT,
+    "imageURL" TEXT,
 
     CONSTRAINT "CodeFragment_pkey" PRIMARY KEY ("id")
 );

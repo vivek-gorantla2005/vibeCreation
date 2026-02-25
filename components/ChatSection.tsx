@@ -11,7 +11,7 @@ import { fetchRealtimeSubscriptionToken } from "@/lib/actions/get-inngest-sub-to
 export const ChatSection = ({ projectId, messages, isAIResponding, handleMessageSent, handleCodeFragmentClick }: { projectId: string, messages: any[], isAIResponding: boolean, handleMessageSent: (newMessage: { content: string; role: "USER"; type: "RESULT" }) => void, handleCodeFragmentClick: (codeFragment: CodeFragment) => void }) => {
     const scrollRef = React.useRef<HTMLDivElement>(null);
     const { latestData } = useInngestSubscription({
-        refreshToken: fetchRealtimeSubscriptionToken
+        refreshToken: () => fetchRealtimeSubscriptionToken(projectId)
     });
 
     const [currentStatus, setCurrentStatus] = React.useState<string | null>(null);
