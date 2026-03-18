@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [main, feat/**]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-lint:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run ESLint
+        run: npm run lint
+
+      - name: Type check
+        run: npx tsc --noEmit
+
+      - name: Build
+        run: npm run build
+        env:
+          # Dummy env vars so build doesn't fail on missing secrets
+          DATABASE_URL: ${{ secrets.DATABASE_URL || 'postgresql://dummy:dummy@localhost:5432/dummy' }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY || 'dummy' }}
+          E2B_API_KEY: ${{ secrets.E2B_API_KEY || 'dummy' }}
+          INNGEST_EVENT_KEY: ${{ secrets.INNGEST_EVENT_KEY || 'dummy' }}
+          INNGEST_SIGNING_KEY: ${{ secrets.INNGEST_SIGNING_KEY || 'dummy' }}
+          NEXT_PUBLIC_APP_URL: http://localhost:3000
